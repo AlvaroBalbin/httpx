@@ -1,4 +1,5 @@
 import http
+from collections.abc import Iterator
 
 import pytest
 
@@ -96,3 +97,26 @@ def test_cookies_repr():
         "<Cookies[<Cookie foo=bar for http://blah.com />,"
         " <Cookie fizz=buzz for http://hello.com />]>"
     )
+
+
+@pytest.mark.parametrize("wrap_cookies", [False, True])
+def test_request_does_not_traverse_cookie_jar_for_truthiness(wrap_cookies):
+    class CountingCookieJar(http.cookiejar.CookieJar):
+        def __init__(self) -> None:
+            super().__init__()
+            self.iterations = 0
+
+        def __iter__(self) -> Iterator[http.cookiejar.Cookie]:
+            self.iterations += 1
+            return super().__iter__()
+
+    jar = CountingCookieJar()
+    httpx.Cookies(jar).set("key", "value", domain="example.org")
+    cookies = httpx.Cookies(jar) if wrap_cookies else jar
+    jar.iterations = 0
+
+    request = httpx.Request("GET", "https://example.org", cookies=cookies)
+
+    assert request.headers["cookie"] == "key=value"
+    # Cookie attachment should traverse the supplied jar only once.
+    assert jar.iterations == 1

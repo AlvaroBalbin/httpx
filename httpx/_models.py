@@ -400,7 +400,7 @@ class Request:
         self.headers = Headers(headers)
         self.extensions = {} if extensions is None else dict(extensions)
 
-        if cookies:
+        if cookies is not None:
             Cookies(cookies).set_cookie_header(self)
 
         if stream is None:
